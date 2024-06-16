@@ -1,0 +1,6 @@
+[submodule "freertos/FreeRTOS"]
+	path = freertos/FreeRTOS
+	url = https://github.com/FreeRTOS/FreeRTOS-Kernel.git
+[submodule "freertos/lib"]
+	path = freertos/lib
+	url = https://github.com/openwch/ch32v20x.git
