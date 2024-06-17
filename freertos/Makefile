@@ -24,10 +24,10 @@ BUILD_DIR = build
 # source
 ######################################
 # C sources
-C_SOURCES = $(shell find src lib/EVT/EXAM/SRC FreeRTOS/portable/GCC/RISC-V FreeRTOS/portable/Common FreeRTOS/portable/MemMang/heap_4.c FreeRTOS/*.c -name *.c)
+C_SOURCES = $(shell find src lib/EVT/EXAM/SRC lib/EVT/EXAM/FreeRTOS/FreeRTOS_Core/FreeRTOS -name *.c)
 
 # ASM sources
-ASM_SOURCES = startup_ch32v20x_D8W.S FreeRTOS/portable/GCC/RISC-V/portASM.S
+ASM_SOURCES = startup_ch32v20x_D8W.S lib/EVT/EXAM/FreeRTOS/FreeRTOS_Core/FreeRTOS/portable/GCC/RISC-V/portASM.S
 
 #######################################
 # binaries
@@ -61,9 +61,9 @@ AS_INCLUDES =
 C_INCLUDES = -Ilib/EVT/EXAM/SRC/Peripheral/inc \
 -Ilib/EVT/EXAM/SRC/Debug \
 -Ilib/EVT/EXAM/SRC/Core \
--IFreeRTOS/include \
--IFreeRTOS/portable/GCC/RISC-V \
--IFreeRTOS/portable/GCC/RISC-V/chip_specific_extensions/RISCV_no_extensions \
+-Ilib/EVT/EXAM/FreeRTOS/FreeRTOS_Core/FreeRTOS/include \
+-Ilib/EVT/EXAM/FreeRTOS/FreeRTOS_Core/FreeRTOS/portable/GCC/RISC-V \
+-Ilib/EVT/EXAM/FreeRTOS/FreeRTOS_Core/FreeRTOS/portable/GCC/RISC-V/chip_specific_extensions/RV32I_PFIC_no_extensions \
 -Isrc
 
 # compile gcc flags
@@ -130,7 +130,7 @@ $(BUILD_DIR):
 # Board
 #######################################
 program: $(BUILD_DIR)/$(TARGET).elf
-	wlink flash --enable-sdi-print --watch-serial $(BUILD_DIR)/$(TARGET).elf
+	wlink -v flash --erase --enable-sdi-print --watch-serial $(BUILD_DIR)/$(TARGET).elf
 
 #######################################
 # clean up

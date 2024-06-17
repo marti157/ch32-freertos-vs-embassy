@@ -15,6 +15,10 @@
  *task1 and task2 alternate printing
  */
 
+#ifndef SDI_PRINT
+#define SDI_PRINT   SDI_PR_OPEN
+#endif
+
 #include "debug.h"
 #include "FreeRTOS.h"
 #include "task.h"
@@ -62,7 +66,7 @@ void task1_task(void *pvParameters)
 {
     while(1)
     {
-        printf("task1 entry\r\n");
+        printf("task1 entry\n");
         GPIO_SetBits(GPIOA, GPIO_Pin_0);
         vTaskDelay(250);
         GPIO_ResetBits(GPIOA, GPIO_Pin_0);
@@ -83,7 +87,7 @@ void task2_task(void *pvParameters)
 {
     while(1)
     {
-        printf("task2 entry\r\n");
+        printf("task2 entry\n");
         GPIO_ResetBits(GPIOA, GPIO_Pin_1);
         vTaskDelay(500);
         GPIO_SetBits(GPIOA, GPIO_Pin_1);
@@ -103,10 +107,10 @@ int main(void)
     NVIC_PriorityGroupConfig(NVIC_PriorityGroup_1);
     SystemCoreClockUpdate();
     Delay_Init();
-    USART_Printf_Init(115200);
-    printf("SystemClk:%d\r\n",SystemCoreClock);
-    printf( "ChipID:%08x\r\n", DBGMCU_GetCHIPID() );
-    printf("FreeRTOS Kernel Version:%s\r\n",tskKERNEL_VERSION_NUMBER);
+    SDI_Printf_Enable();
+    printf("SystemClk:%d\n",SystemCoreClock);
+    printf( "ChipID:%08x\n", DBGMCU_GetCHIPID() );
+    printf("FreeRTOS Kernel Version:%s\n",tskKERNEL_VERSION_NUMBER);
 
     GPIO_Toggle_INIT();
     /* create two task */
@@ -127,7 +131,8 @@ int main(void)
 
     while(1)
     {
-        printf("shouldn't run at here!!\n");
+        printf("Shouldn't reach here\n");
+        Delay_Ms(1000);
     }
 }
 
