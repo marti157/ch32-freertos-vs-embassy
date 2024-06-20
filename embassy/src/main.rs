@@ -9,6 +9,7 @@ use core::task::Poll;
 use embassy_executor::Spawner;
 use embassy_sync::waitqueue::AtomicWaker;
 use embassy_time::Timer;
+use hal::gpio::{Level, Output};
 use hal::pac;
 use hal::{i2c::I2c, peripherals, prelude::Hertz, println};
 use qingke::riscv;
@@ -47,9 +48,15 @@ fn enable_interrupts() {
 }
 
 #[embassy_executor::task]
-async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>) {
+async fn i2c_task(
+    mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>,
+    mut toggle_pin: Output<'static>,
+) {
     loop {
         disable_interrupts();
+
+        // Indicate request start by setting pin
+        toggle_pin.set_high();
 
         // Request BMP device ID
         match i2c.blocking_write(0x77, &[0xD0]) {
@@ -98,6 +105,9 @@ async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>)
         })
         .await;
 
+        // Indicate request end by setting pin
+        toggle_pin.set_low();
+
         println!("id: {id}");
 
         Timer::after_secs(1).await;
@@ -129,7 +139,9 @@ async fn main(spawner: Spawner) {
     let sda = p.PB11;
     let i2c = I2c::new_blocking(p.I2C2, scl, sda, Hertz::hz(400_000), Default::default());
 
-    spawner.spawn(i2c_task(i2c)).unwrap();
+    let toggle_pin = Output::new(p.PA0, Level::Low, Default::default());
+
+    spawner.spawn(i2c_task(i2c, toggle_pin)).unwrap();
     spawner.spawn(long_running()).unwrap();
 }
 
