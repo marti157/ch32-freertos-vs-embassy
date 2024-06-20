@@ -8,6 +8,7 @@ ch32-hal = { default-features = false, features = [
     "ch32v208wbu6",
     "embassy",
     "rt",
+    "time-driver-tim2",
 ], git = "https://github.com/ch32-rs/ch32-hal.git", rev = "56de16c1aab4250d9beda0aeeb9b14712035a24c" }
 embassy-executor = { version = "0.5.0", features = [
     "nightly",

@@ -14,24 +14,33 @@ use hal::{i2c::I2c, peripherals, prelude::Hertz, println};
 use qingke::riscv;
 use qingke_rt::interrupt;
 
+static WAKER: AtomicWaker = AtomicWaker::new();
+
 #[interrupt]
 fn I2C2_EV() {
-    println!("I2C2_EV");
-    pac::I2C2.ctlr2().modify(|w| {
-        w.set_itevten(false);
-    });
+    // println!("I2C2_EV");
+    WAKER.wake();
+    disable_interrupts();
 }
 
 #[interrupt]
 fn I2C2_ER() {
-    println!("I2C2_ER");
+    // println!("I2C2_ER");
+    WAKER.wake();
+    disable_interrupts();
+}
+
+fn disable_interrupts() {
     pac::I2C2.ctlr2().modify(|w| {
+        w.set_itbufen(false);
+        w.set_itevten(false);
         w.set_iterren(false);
     });
 }
 
 fn enable_interrupts() {
     pac::I2C2.ctlr2().modify(|w| {
+        w.set_itbufen(true);
         w.set_iterren(true);
         w.set_itevten(true);
     });
@@ -39,11 +48,14 @@ fn enable_interrupts() {
 
 #[embassy_executor::task]
 async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>) {
-    let waker = AtomicWaker::new();
-    
     loop {
+        disable_interrupts();
+
         // Request BMP device ID
-        i2c.blocking_write(0x77, &[0xD0]).unwrap();
+        match i2c.blocking_write(0x77, &[0xD0]) {
+            Err(msg) => println!("{:?}", msg),
+            Ok(_) => (),
+        }
 
         // Send start condition
         pac::I2C2.ctlr1().modify(|reg| {
@@ -54,8 +66,6 @@ async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>)
         // Wait for start condition to be generated
         while !pac::I2C2.star1().read().sb() {}
 
-        println!("start condition generated.");
-
         // Set device address
         pac::I2C2
             .datar()
@@ -63,8 +73,6 @@ async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>)
 
         // Wait for address to be acknowledged
         while !pac::I2C2.star1().read().addr() {}
-
-        println!("address acknowledged.");
 
         // Clear condition
         pac::I2C2.star2().read();
@@ -78,7 +86,7 @@ async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>)
         });
 
         let id = poll_fn(|cx| {
-            waker.register(cx.waker());
+            WAKER.register(cx.waker());
 
             match pac::I2C2.star1().read().rx_ne() {
                 true => Poll::Ready(pac::I2C2.datar().read().0),
@@ -90,14 +98,9 @@ async fn i2c_task(mut i2c: I2c<'static, peripherals::I2C2, hal::mode::Blocking>)
         })
         .await;
 
-        pac::I2C2.ctlr1().modify(|w| {
-            w.set_ack(false);
-            w.set_stop(true);
-        });
-        
         println!("id: {id}");
 
-        Timer::after_secs(5).await;
+        Timer::after_secs(1).await;
     }
 }
 
