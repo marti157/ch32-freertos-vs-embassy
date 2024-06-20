@@ -19,6 +19,7 @@ embassy-time = { version = "0.3.0" }
 qingke = { version = "0.2.0" }
 qingke-rt = { version = "0.2.1" }
 panic-halt = "0.2.0"
+embassy-sync = "0.6.0"
 
 [profile.release]
 strip = false   # Symbols are not flashed to the microcontroller, so don't strip them.
