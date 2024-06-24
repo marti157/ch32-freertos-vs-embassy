@@ -19,14 +19,12 @@ static WAKER: AtomicWaker = AtomicWaker::new();
 
 #[interrupt]
 fn I2C2_EV() {
-    // println!("I2C2_EV");
     WAKER.wake();
     disable_interrupts();
 }
 
 #[interrupt]
 fn I2C2_ER() {
-    // println!("I2C2_ER");
     WAKER.wake();
     disable_interrupts();
 }
@@ -55,62 +53,61 @@ async fn i2c_task(
     loop {
         disable_interrupts();
 
-        // Indicate request start by setting pin
+        // Indicate sequence start by setting pin
         toggle_pin.set_high();
 
-        // Request BMP device ID
-        match i2c.blocking_write(0x77, &[0xD0]) {
-            Err(msg) => println!("{:?}", msg),
-            Ok(_) => (),
+        for _ in 0..2000 {
+            // Request BMP device ID
+            match i2c.blocking_write(0x77, &[0xD0]) {
+                Err(msg) => println!("{:?}", msg),
+                Ok(_) => (),
+            }
+
+            // Send start condition
+            pac::I2C2.ctlr1().modify(|reg| {
+                reg.set_start(true);
+                reg.set_ack(true);
+            });
+
+            // Wait for start condition to be generated
+            while !pac::I2C2.star1().read().sb() {}
+
+            // Set device address
+            pac::I2C2
+                .datar()
+                .write(|reg| reg.set_datar((0x77 << 1) + 1));
+
+            // Wait for address to be acknowledged
+            while !pac::I2C2.star1().read().addr() {}
+
+            // Clear condition
+            pac::I2C2.star2().read();
+
+            enable_interrupts();
+
+            // only one byte
+            pac::I2C2.ctlr1().modify(|w| {
+                w.set_ack(false);
+                w.set_stop(true);
+            });
+
+            let _id = poll_fn(|cx| {
+                WAKER.register(cx.waker());
+
+                match pac::I2C2.star1().read().rx_ne() {
+                    true => Poll::Ready(pac::I2C2.datar().read().0),
+                    false => {
+                        enable_interrupts();
+                        Poll::Pending
+                    }
+                }
+            })
+            .await;
         }
 
-        // Send start condition
-        pac::I2C2.ctlr1().modify(|reg| {
-            reg.set_start(true);
-            reg.set_ack(true);
-        });
-
-        // Wait for start condition to be generated
-        while !pac::I2C2.star1().read().sb() {}
-
-        // Set device address
-        pac::I2C2
-            .datar()
-            .write(|reg| reg.set_datar((0x77 << 1) + 1));
-
-        // Wait for address to be acknowledged
-        while !pac::I2C2.star1().read().addr() {}
-
-        // Clear condition
-        pac::I2C2.star2().read();
-
-        enable_interrupts();
-
-        // only one byte
-        pac::I2C2.ctlr1().modify(|w| {
-            w.set_ack(false);
-            w.set_stop(true);
-        });
-
-        let id = poll_fn(|cx| {
-            WAKER.register(cx.waker());
-
-            match pac::I2C2.star1().read().rx_ne() {
-                true => Poll::Ready(pac::I2C2.datar().read().0),
-                false => {
-                    enable_interrupts();
-                    Poll::Pending
-                }
-            }
-        })
-        .await;
-
-        // Indicate request end by setting pin
+        // Indicate sequence end by resetting pin
         toggle_pin.set_low();
-
-        println!("id: {id}");
-
-        Timer::after_secs(1).await;
+        Timer::after_millis(1).await;
     }
 }
 
